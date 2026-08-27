@@ -479,6 +479,80 @@
     letter-spacing:.02em;
   }
   .diagram pre.mermaid{ background:transparent; margin:0; }
+  .diagram{ cursor:zoom-in; }
+  .diagram:hover{ border-color:var(--border-strong); }
+  main img{
+    cursor:zoom-in;
+    max-width:100%;
+    height:auto;
+    border-radius:10px;
+  }
+
+  /* ============ Lightbox ============ */
+  .lightbox{
+    position:fixed;
+    inset:0;
+    z-index:80;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:28px 20px;
+    background:rgba(22,19,14,.72);
+    backdrop-filter:blur(8px);
+  }
+  .lightbox[hidden]{ display:none; }
+  .lightbox-dialog{
+    position:relative;
+    width:min(1600px, 94vw);
+    height:min(920px, 92vh);
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    background:var(--surface);
+    border:1px solid var(--border-strong);
+    border-radius:14px;
+    padding:44px 28px 20px;
+    box-shadow:var(--shadow);
+  }
+  #lightboxInner{
+    flex:1;
+    min-height:0;
+    width:100%;
+    display:flex;
+    flex-direction:column;
+  }
+  .lightbox-dialog img,
+  .lightbox-dialog svg{
+    display:block;
+    width:100%;
+    flex:1;
+    min-height:0;
+    height:100%;
+    object-fit:contain;
+    cursor:default;
+  }
+  .lightbox-cap{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--ink-faint);
+    margin:14px 0 0;
+    letter-spacing:.02em;
+  }
+  .lightbox-close{
+    position:absolute;
+    top:10px;
+    right:10px;
+    width:36px;
+    height:36px;
+    border:0;
+    border-radius:8px;
+    background:var(--surface-2);
+    color:var(--ink-muted);
+    font-size:22px;
+    line-height:1;
+    cursor:pointer;
+  }
+  .lightbox-close:hover{ color:var(--ink); background:var(--surface-3); }
 
   /* ============ Key takeaways ============ */
   .takeaways{
@@ -2609,6 +2683,13 @@ flowchart LR
   </div>
 </div>
 
+<div class="lightbox" id="lightbox" hidden>
+  <div class="lightbox-dialog" role="dialog" aria-modal="true" aria-label="Enlarged figure" id="lightboxDialog">
+    <button class="lightbox-close" id="lightboxClose" type="button" aria-label="Close">&times;</button>
+    <div id="lightboxInner"></div>
+  </div>
+</div>
+
 <script>
   (function(){
     var root = document.documentElement;
@@ -2673,6 +2754,88 @@ flowchart LR
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>
   mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "strict" });
+
+  (function(){
+    var box = document.getElementById('lightbox');
+    var inner = document.getElementById('lightboxInner');
+    var closeBtn = document.getElementById('lightboxClose');
+    if(!box || !inner) return;
+
+    function svgToImage(svg){
+      var clone = svg.cloneNode(true);
+      if(!clone.getAttribute('xmlns')) clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      if(!clone.getAttribute('viewBox')){
+        try{
+          var box = svg.getBBox();
+          if(box && box.width){
+            clone.setAttribute('viewBox', box.x + ' ' + box.y + ' ' + box.width + ' ' + box.height);
+          }
+        }catch(err){}
+      }
+      clone.removeAttribute('width');
+      clone.removeAttribute('height');
+      clone.style.maxWidth = 'none';
+      clone.style.width = '100%';
+      clone.style.height = '100%';
+      var xml = new XMLSerializer().serializeToString(clone);
+      var img = document.createElement('img');
+      img.alt = '';
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+      return img;
+    }
+
+    function openLightbox(node, caption){
+      inner.innerHTML = '';
+      inner.appendChild(node);
+      if(caption){
+        var cap = document.createElement('p');
+        cap.className = 'lightbox-cap';
+        cap.textContent = caption;
+        inner.appendChild(cap);
+      }
+      box.hidden = false;
+      document.body.style.overflow = 'hidden';
+      if(closeBtn) closeBtn.focus();
+    }
+
+    function closeLightbox(){
+      if(box.hidden) return;
+      box.hidden = true;
+      inner.innerHTML = '';
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('click', function(e){
+      if(e.target === box || (closeBtn && closeBtn.contains(e.target))){
+        closeLightbox();
+        return;
+      }
+      if(!box.hidden) return;
+
+      var img = e.target.closest('main img');
+      if(img){
+        e.preventDefault();
+        var clone = document.createElement('img');
+        clone.src = img.currentSrc || img.src;
+        clone.alt = img.alt || '';
+        openLightbox(clone, img.alt || '');
+        return;
+      }
+
+      var diagram = e.target.closest('.diagram');
+      if(diagram){
+        var svg = diagram.querySelector('svg');
+        if(!svg) return;
+        e.preventDefault();
+        var capEl = diagram.querySelector('.cap');
+        openLightbox(svgToImage(svg), capEl ? capEl.textContent.trim() : '');
+      }
+    });
+
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Escape') closeLightbox();
+    });
+  })();
 </script>
 </body>
 </html>
